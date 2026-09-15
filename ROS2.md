@@ -22,6 +22,7 @@ curl -s https://mirrors.tuna.tsinghua.edu.cn/rosdistro/ros.key | sudo gpg --dear
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
 sudo apt update
 ### 安装
+'''
 sudo apt install ros-humble-desktop -y
 ### 配置环境变量
 echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
