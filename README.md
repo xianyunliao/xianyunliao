@@ -1,3 +1,4 @@
 # Git Repository
 Hi there!
-It's Xianyun,I create this repository for work on robotics since September 2026, under Xu Yang
+It's Xianyun, currently working in Shanghai 🥰
+I create this repository for logging my progress on robotics since September 2026, under Xu Yang.
