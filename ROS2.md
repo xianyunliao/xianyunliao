@@ -30,4 +30,9 @@
 `dpkg -l | grep ros-humble`
 `ros2 --help`
 
+## ssh登录检查
+`sudo systemctl status ssh`
+`ip a`
+`ssh xianyun@+ip`
+
 
