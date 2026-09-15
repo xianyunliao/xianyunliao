@@ -2,7 +2,7 @@
 ## VMware register <-- broadcom signing
 原因：Broadcom账号认证（verification）时间过长
 直接下载安装包
-
+```bash
 ## 镜像下载
 22.04版本适配 ROS2 Humble
 ## ROS2 Humble 的配置
@@ -22,7 +22,6 @@ curl -s https://mirrors.tuna.tsinghua.edu.cn/rosdistro/ros.key | sudo gpg --dear
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] https://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
 sudo apt update
 ### 安装
-'''
 sudo apt install ros-humble-desktop -y
 ### 配置环境变量
 echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
