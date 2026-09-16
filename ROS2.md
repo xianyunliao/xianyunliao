@@ -59,5 +59,10 @@
 `sudo apt update`
 `sudo apt install x11-apps libxcb-cursor0 ros-humble-turtlesim`
 
-
-
+## rqt使用
+参考海龟的配置环境
+`ssh -Y xianyun@192.168.240.131`
+`source /opt/ros/humble/setup.bash`
+`rqt`
+### 使用插件
+“Plugins” --> “Services” --> “Service caller”
