@@ -33,6 +33,6 @@
 ## ssh登录检查
 `sudo systemctl status ssh`
 `ip a`
-`ssh xianyun@+ip`
+`ssh xianyun@192.168.240.131`
 
 
