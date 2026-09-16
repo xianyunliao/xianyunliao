@@ -30,9 +30,31 @@
 `dpkg -l | grep ros-humble`
 `ros2 --help`
 
-## ssh登录检查
+## ⚠️ssh登录检查
 `sudo systemctl status ssh`
 `ip a`
 `ssh xianyun@192.168.240.131`
+
+## 辅助：Mac + XQuartz SSH 远程运行 ROS2 Humble turtlesim 完整步骤
+### 安装 XQuartz（Mac 上的 X11 图形转发服务）
+`brew install --cask xquartz`
+在terminal运行
+`ssh -Y xianyun@192.168.240.131`
+加载ROS2环境
+`source /opt/ros/humble/setup.bash`
+`export QT_X11_NO_MITSHM=1`
+`ros2 run turtlesim turtlesim_node`
+### Ubuntu 虚拟机端操作
+修改 ssh 配置文件
+`sudo nano /etc/ssh/sshd_config`
+
+`X11Forwarding yes`
+`X11UseLocalhost no`
+重启 ssh 服务
+`sudo systemctl restart sshd`
+安装图形依赖包（防止缺少库）
+`sudo apt update`
+`sudo apt install x11-apps libxcb-cursor0 ros-humble-turtlesim`
+
 
 
