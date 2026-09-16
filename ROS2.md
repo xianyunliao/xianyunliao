@@ -43,7 +43,10 @@
 加载ROS2环境
 `source /opt/ros/humble/setup.bash`
 `export QT_X11_NO_MITSHM=1`
+#### 图形显示界面
 `ros2 run turtlesim turtlesim_node`
+#### 图形操作界面
+`ros2 run turtlesim turtle_teleop_key`
 ### Ubuntu 虚拟机端操作
 修改 ssh 配置文件
 `sudo nano /etc/ssh/sshd_config`
