@@ -4,6 +4,7 @@
 直接下载安装包
 ## 镜像下载
 22.04版本适配 ROS2 Humble
+multipass安装也可以
 ## ROS2 Humble 的配置
 ### ssh 初始化命令
 `sudo apt install openssh-server -y`
