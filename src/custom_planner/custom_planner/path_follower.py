@@ -1,0 +1,501 @@
+import math
+
+import rclpy
+from rclpy.node import Node
+
+from nav_msgs.msg import Path
+from nav_msgs.msg import Odometry
+
+from geometry_msgs.msg import Twist
+
+
+class PathFollower(Node):
+
+    def __init__(self):
+        super().__init__('path_follower')
+
+        # ==========================================================
+        # Subscribers
+        # ==========================================================
+
+        self.path_sub = self.create_subscription(
+            Path,
+            '/plan',
+            self.path_callback,
+            10
+        )
+
+        self.odom_sub = self.create_subscription(
+            Odometry,
+            '/odom',
+            self.odom_callback,
+            10
+        )
+
+        # ==========================================================
+        # Publisher
+        # ==========================================================
+
+        self.cmd_pub = self.create_publisher(
+            Twist,
+            '/cmd_vel',
+            10
+        )
+
+        # ==========================================================
+        # Robot state
+        # ==========================================================
+
+        self.robot_x = None
+        self.robot_y = None
+        self.robot_yaw = None
+
+        # ==========================================================
+        # Path
+        # ==========================================================
+
+        self.path = None
+
+        # 当前是否正在执行路径
+        self.path_active = False
+
+        # 保存当前路径的终点
+        self.goal_x = None
+        self.goal_y = None
+        
+        self.last_path_signature = None
+        self.path_signature = None
+
+        # ==========================================================
+        # Parameters
+        # ==========================================================
+
+        self.max_linear_speed = 0.20
+        self.max_angular_speed = 0.8
+
+        self.goal_tolerance = 0.05
+
+        self.lookahead_distance = 0.20
+
+        # ==========================================================
+        # Control timer
+        # ==========================================================
+
+        self.control_timer = self.create_timer(
+            0.1,
+            self.control_loop
+        )
+
+        self.get_logger().info(
+            'A* Path Follower started.'
+        )
+
+        self.get_logger().info(
+            'Waiting for /plan and /odom ...'
+        )
+
+    # ==============================================================
+    # Path callback
+    # ==============================================================
+
+    def path_callback(self, msg):
+
+        if len(msg.poses) == 0:
+            return
+
+        # ----------------------------------------------------------
+        # 如果当前正在执行路径
+        # 忽略 A* 的重复发布
+        # ----------------------------------------------------------
+
+        if self.path_active:
+            return
+        
+        last_pose = msg.poses[-1].pose.position
+
+        path_signature = (
+            len(msg.poses),
+            round(last_pose.x, 3),
+            round(last_pose.y, 3)
+        )
+
+        if path_signature == self.last_path_signature:
+            return
+
+        self.last_path_signature = path_signature
+        # ----------------------------------------------------------
+        # 保存新路径
+        # ----------------------------------------------------------
+
+        self.path = msg.poses
+
+        self.goal_x = (
+            self.path[-1].pose.position.x
+        )
+
+        self.goal_y = (
+            self.path[-1].pose.position.y
+        )
+
+        self.path_active = True
+
+        self.get_logger().info(
+            f'New A* path accepted: '
+            f'{len(self.path)} points'
+        )
+
+        self.get_logger().info(
+            f'Path goal: '
+            f'x={self.goal_x:.3f}, '
+            f'y={self.goal_y:.3f}'
+        )
+
+    # ==============================================================
+    # Odometry callback
+    # ==============================================================
+
+    def odom_callback(self, msg):
+
+        self.robot_x = (
+            msg.pose.pose.position.x
+        )
+
+        self.robot_y = (
+            msg.pose.pose.position.y
+        )
+
+        q = msg.pose.pose.orientation
+
+        sin_yaw = (
+            2.0 *
+            (
+                q.w * q.z
+                + q.x * q.y
+            )
+        )
+
+        cos_yaw = (
+            1.0
+            - 2.0 *
+            (
+                q.y * q.y
+                + q.z * q.z
+            )
+        )
+
+        self.robot_yaw = math.atan2(
+            sin_yaw,
+            cos_yaw
+        )
+
+    # ==============================================================
+    # Find target point
+    # ==============================================================
+
+    def find_target_point(self):
+
+        if self.path is None:
+            return None
+
+        nearest_index = 0
+
+        nearest_distance = float('inf')
+
+        # ----------------------------------------------------------
+        # 找距离机器人最近的路径点
+        # ----------------------------------------------------------
+
+        for i, pose in enumerate(self.path):
+
+            px = pose.pose.position.x
+            py = pose.pose.position.y
+
+            dx = px - self.robot_x
+            dy = py - self.robot_y
+
+            distance = math.sqrt(
+                dx * dx
+                + dy * dy
+            )
+
+            if distance < nearest_distance:
+
+                nearest_distance = distance
+                nearest_index = i
+
+        # ----------------------------------------------------------
+        # 从最近点向前寻找前视点
+        # ----------------------------------------------------------
+
+        for i in range(
+            nearest_index,
+            len(self.path)
+        ):
+
+            px = self.path[i].pose.position.x
+            py = self.path[i].pose.position.y
+
+            dx = px - self.robot_x
+            dy = py - self.robot_y
+
+            distance = math.sqrt(
+                dx * dx
+                + dy * dy
+            )
+
+            if distance >= self.lookahead_distance:
+
+                return px, py
+
+        # ----------------------------------------------------------
+        # 没有前视点时使用终点
+        # ----------------------------------------------------------
+
+        return (
+            self.goal_x,
+            self.goal_y
+        )
+
+    # ==============================================================
+    # Normalize angle
+    # ==============================================================
+
+    def normalize_angle(self, angle):
+
+        while angle > math.pi:
+            angle -= 2.0 * math.pi
+
+        while angle < -math.pi:
+            angle += 2.0 * math.pi
+
+        return angle
+
+    # ==============================================================
+    # Control loop
+    # ==============================================================
+
+    def control_loop(self):
+
+        # ----------------------------------------------------------
+        # 没有正在执行的路径
+        # ----------------------------------------------------------
+
+        if not self.path_active:
+            self.stop_robot()
+            return
+
+        # ----------------------------------------------------------
+        # 等待 odom
+        # ----------------------------------------------------------
+
+        if self.robot_x is None:
+            self.stop_robot()
+            return
+
+        if self.robot_y is None:
+            self.stop_robot()
+            return
+
+        if self.robot_yaw is None:
+            self.stop_robot()
+            return
+
+        # ----------------------------------------------------------
+        # 计算距离终点的距离
+        # ----------------------------------------------------------
+
+        dx_goal = (
+            self.goal_x
+            - self.robot_x
+        )
+
+        dy_goal = (
+            self.goal_y
+            - self.robot_y
+        )
+
+        goal_distance = math.sqrt(
+            dx_goal * dx_goal
+            + dy_goal * dy_goal
+        )
+
+        # ----------------------------------------------------------
+        # 到达目标
+        # ----------------------------------------------------------
+
+        if goal_distance < self.goal_tolerance:
+
+            self.stop_robot()
+
+            self.get_logger().info(
+                f'Goal reached! '
+                f'distance={goal_distance:.3f} m'
+            )
+
+            # ------------------------------------------------------
+            # 清除路径
+            # ------------------------------------------------------
+
+            self.path_active = False
+            self.path = None
+
+            return
+
+        # ----------------------------------------------------------
+        # 获取前视点
+        # ----------------------------------------------------------
+
+        target = self.find_target_point()
+
+        if target is None:
+
+            self.stop_robot()
+
+            return
+
+        target_x, target_y = target
+
+        # ----------------------------------------------------------
+        # 计算目标方向
+        # ----------------------------------------------------------
+
+        dx = (
+            target_x
+            - self.robot_x
+        )
+
+        dy = (
+            target_y
+            - self.robot_y
+        )
+
+        target_angle = math.atan2(
+            dy,
+            dx
+        )
+
+        # ----------------------------------------------------------
+        # 角度误差
+        # ----------------------------------------------------------
+
+        angle_error = (
+            target_angle
+            - self.robot_yaw
+        )
+
+        angle_error = (
+            self.normalize_angle(
+                angle_error
+            )
+        )
+
+        # ----------------------------------------------------------
+        # 创建 Twist
+        # ----------------------------------------------------------
+
+        cmd = Twist()
+
+        # ----------------------------------------------------------
+        # 角速度
+        # ----------------------------------------------------------
+
+        angular_speed = (
+            2.0 * angle_error
+        )
+
+        angular_speed = max(
+            -self.max_angular_speed,
+            min(
+                self.max_angular_speed,
+                angular_speed
+            )
+        )
+
+        cmd.angular.z = angular_speed
+
+        # ----------------------------------------------------------
+        # 方向误差较大
+        # 原地旋转
+        # ----------------------------------------------------------
+
+        if abs(angle_error) > 0.5:
+
+            cmd.linear.x = 0.0
+
+        else:
+
+            speed_factor = (
+                1.0
+                - abs(angle_error) / 0.5
+            )
+
+            speed_factor = max(
+                0.0,
+                min(
+                    1.0,
+                    speed_factor
+                )
+            )
+
+            cmd.linear.x = (
+                self.max_linear_speed
+                * speed_factor
+            )
+
+        # ----------------------------------------------------------
+        # 发布速度
+        # ----------------------------------------------------------
+
+        self.cmd_pub.publish(
+            cmd
+        )
+
+    # ==============================================================
+    # Stop
+    # ==============================================================
+
+    def stop_robot(self):
+
+        cmd = Twist()
+
+        cmd.linear.x = 0.0
+        cmd.linear.y = 0.0
+        cmd.linear.z = 0.0
+
+        cmd.angular.x = 0.0
+        cmd.angular.y = 0.0
+        cmd.angular.z = 0.0
+
+        self.cmd_pub.publish(
+            cmd
+        )
+
+
+def main(args=None):
+
+    rclpy.init(
+        args=args
+    )
+
+    node = PathFollower()
+
+    try:
+
+        rclpy.spin(node)
+
+    except KeyboardInterrupt:
+
+        pass
+
+    finally:
+
+        node.stop_robot()
+
+        node.destroy_node()
+
+        rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
+    

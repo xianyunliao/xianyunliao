@@ -1,0 +1,51 @@
+# ROS 2 build outputs
+build/
+install/
+log/
+
+# ROS / colcon
+.colcon/
+.ros/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.swp
+*.swo
+*~
+
+# Temporary TF frame graph files
+frames_*.gv
+frames_*.pdf
+Transient
+
+# Backup Git metadata from nested repositories
+.git.backup/
+
+# Visual Studio / .NET
+.vs/
+obj/
+bin/
+
+# C# / Visual Studio user files
+*.suo
+*.user
+*.userosscache
+*.csproj.user
